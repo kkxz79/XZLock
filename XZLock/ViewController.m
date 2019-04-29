@@ -25,12 +25,17 @@
     switch (_lockType) {
         case 1:
         {
+            
+            //[self synchronizedLock];
             [self synchronizedNestLock];
         }
             break;
         case 2:
         {
-            [self nsLockOne];
+//            [self nsLockOne];
+//            [self nsLockTwo];
+//            [self nsLockThree];
+            [self nsLockFour];
         }
             break;
         case 3:
@@ -55,7 +60,7 @@
             break;
         case 7:
         {
-            //[self pthread_mutex];
+//            [self pthread_mutex];
             [self pthread_mutex_recursive];
         }
             break;
@@ -64,22 +69,16 @@
             [self osspinLock];
         }
             break;
-        case 9:
-        {
-            
-        }
-            break;
-        case 10:
-        {
-            
-        }
-            break;
         default:
             break;
     }
 }
 
 //TODO:@synchronized
+
+/**
+ @synchronized 指令实现锁
+ */
 -(void)synchronizedLock
 {
     NSObject *obj = [[NSObject alloc] init];
@@ -94,34 +93,42 @@
     
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         sleep(1);
-        @synchronized (obj) {
+        @synchronized (obj) { //此处如果改为self，那么线程操作2就不会被阻塞
             NSLog(@"需要线程同步操作2");
         }
     });
     
 }
 
+
+/**
+ @synchronized 指令实现锁 - 嵌套
+ */
 -(void)synchronizedNestLock
 {
     NSObject *obj = [[NSObject alloc] init];
     @synchronized (obj) {
         NSLog(@"1st sync");
+        sleep(2);
         @synchronized (obj) {
             NSLog(@"2nd sync");
         }
     }
 }
 
-//TODO:NSLock
-//NSLocking,NSLock 实现了最基本的互斥锁，遵循了 NSLocking 协议，通过 lock 和 unlock 来进行锁定和解锁。
+//TODO:NSLock - 基本互斥锁
+/*NSLocking,NSLock 实现了最基本的互斥锁，遵循了 NSLocking 协议，
+ 通过 lock 和 unlock 来进行锁定和解锁。
+ */
 -(void)nsLockOne
 {
-    //由于是互斥锁，当一个线程进行访问的时候，该线程获得锁，其他线程进行访问的时候将被操作系统挂起，直到该线程释放锁，其他线程才能对其进行访问，从而确保了线程安全。
+    //由于是互斥锁，当一个线程进行访问的时候，该线程获得锁，其他线程进行访问的时候将被操作系统挂起，
+    //直到该线程释放锁，其他线程才能对其进行访问，从而确保了线程安全。
     NSLock * xzLock = [[NSLock alloc] init];
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         [xzLock lock];
         NSLog(@"线程1加锁成功");
-        //[xzLock lock];//如果连续锁定两次，则会造成死锁。
+//        [xzLock lock];//如果连续锁定两次，则会造成死锁。
         sleep(2);
         [xzLock unlock];
         NSLog(@"线程1解锁成功");
@@ -140,6 +147,7 @@
 {
     NSLock * xzLock = [[NSLock alloc] init];
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSLog(@"1-当前线程%@",[NSThread currentThread]);
         [xzLock lock];
         NSLog(@"线程1加锁成功");
         sleep(2);
@@ -148,13 +156,16 @@
     });
     
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-        //tryLock 并不会阻塞线程，[cjlock tryLock] 能加锁返回 YES，不能加锁返回 NO，然后都会执行后续代码。
-        //当前线程锁失败，也可以继续其它任务，用 trylock 合适；当前线程只有锁成功后，才会做一些有意义的工作，那就 lock，没必要轮询 trylock。
+        //tryLock 并不会阻塞线程，[xzLock tryLock] 能加锁返回 YES，不能加锁返回 NO，然后都会执行后续代码。
+        //当前线程锁失败，也可以继续其它任务，用 trylock 合适；
+        //当前线程只有锁成功后，才会做一些有意义的工作，那就 lock，没必要轮询 trylock。
+        NSLog(@"2-当前线程%@",[NSThread currentThread]);
         if([xzLock tryLock]){
             NSLog(@"线程3加锁成功");
             [xzLock unlock];
             NSLog(@"线程3解锁成功");
-        }else{
+        }
+        else{
             NSLog(@"线程3加锁失败");
         }
     });
@@ -164,6 +175,7 @@
 {
     NSLock * xzLock = [[NSLock alloc] init];
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSLog(@"1-当前线程%@",[NSThread currentThread]);
         [xzLock lock];
         NSLog(@"线程1加锁成功");
         sleep(2);
@@ -173,6 +185,7 @@
     
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         sleep(3);
+        NSLog(@"2-当前线程%@",[NSThread currentThread]);
         if([xzLock tryLock]){
             NSLog(@"线程4加锁成功");
             [xzLock unlock];
@@ -196,7 +209,8 @@
     
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         sleep(3);
-        //lockBeforeDate: 方法会在所指定 Date 之前尝试加锁，会阻塞线程，如果在指定时间之前都不能加锁，则返回 NO，指定时间之前能加锁，则返回 YES。
+        //lockBeforeDate: 方法会在所指定 Date 之前尝试加锁，会阻塞线程，
+        //如果在指定时间之前都不能加锁，则返回 NO，指定时间之前能加锁，则返回 YES。
         if([xzLock lockBeforeDate:[NSDate dateWithTimeIntervalSinceNow:10]]){
             NSLog(@"线程5加锁成功");
             [xzLock unlock];
@@ -228,7 +242,10 @@
         };
         RecursiveBlock(3);
     });
-    //如果使用NSLock的话，zkLock先上锁，但未执行解锁的时候，就会进入递归的下一层，而再次请求上锁，阻塞了该线程，线程被阻塞了，自然后面的解锁代码不会执行，而形成了死锁。而递归d锁就是为了解决这个问题。
+    /*如果使用NSLock的话，zkLock先上锁，但未执行解锁的时候，就会进入递归的下一层，
+     而再次请求上锁，阻塞了该线程，线程被阻塞了，自然后面的解锁代码不会执行，而形成了死锁。
+     而递归锁就是为了解决这个问题。
+     */
     
 }
 
@@ -263,9 +280,10 @@
         if([xzLock tryLockWhenCondition:0]){
             NSLog(@"线程3加锁成功");
             sleep(2);
-            [xzLock unlockWithCondition:2];
+            [xzLock unlockWithCondition:2]; //线程3解锁，并修改condition值为2
             NSLog(@"线程3解锁成功");
-        }else{
+        }
+        else{
             NSLog(@"线程3尝试加锁失败");
         }
     });
@@ -275,7 +293,7 @@
         //锁定和解锁的调用可以随意组合，也就是说 lock、lockWhenCondition:与unlock、unlockWithCondition: 是可以按照自己的需求随意组合的。
         if([xzLock lockWhenCondition:2 beforeDate:[NSDate dateWithTimeIntervalSinceNow:10]]){
             NSLog(@"线程4加锁成功");
-            [xzLock unlockWithCondition:1];
+            [xzLock unlockWithCondition:1];//线程4解锁，并修改condition值为1
             NSLog(@"线程4解锁成功");
         }else{
             NSLog(@"线程4尝试加锁失败");
@@ -287,10 +305,15 @@
 /*
  NSCondition 是一种特殊类型的锁，通过它可以实现不同线程的调度。
  一个线程被某个条件所阻塞，知道另一个线程满足该条件从而发送信号给该线程使得该线程可以正确的执行。
- 比如：你可以开启一个线程下载图片，一个线程处理图片。这样的话，需要处理图片的线程由于没有图片会阻塞，当下载线程下载完成后，则满足了需要处理图片的线程的需求，这样可以给定一个信号，让处理图片的线程恢复运行
+ 比如：你可以开启一个线程下载图片，一个线程处理图片。
+ 这样的话，需要处理图片的线程由于没有图片会阻塞，当下载线程下载完成后，
+ 则满足了需要处理图片的线程的需求，这样可以给定一个信号，让处理图片的线程恢复运行
  */
 /*
- NSCondition 的对象实际上作为一个锁和一个线程检查器，锁上之后其它线程也能上锁，而之后可以根据条件决定是否继续运行线程，即线程是否要进入 waiting 状态，如果进入 waiting 状态，当其它线程中的该锁执行 signal 或者 broadcast 方法时，线程被唤醒，继续运行之后的方法。
+ NSCondition 的对象实际上作为一个锁和一个线程检查器，
+ 锁上之后其它线程也能上锁，而之后可以根据条件决定是否继续运行线程，
+ 即线程是否要进入 waiting 状态，如果进入 waiting 状态，
+ 当其它线程中的该锁执行 signal 或者 broadcast 方法时，线程被唤醒，继续运行之后的方法。
  NSConditon可以手动控制线程的挂起与唤醒，可以利用这个特性设置依赖。
  */
 -(void)condition
@@ -313,13 +336,16 @@
             NSLog(@"线程2线程解锁");
         }
     });
+    
     dispatch_async(dispatch_get_global_queue(0, 0), ^{
         sleep(2);
-       // [xzCondition signal];
+        //[xzCondition signal];
         [xzCondition broadcast];
         /*
-         在加上锁之后，调用条件对象的 wait 或 waitUntilDate: 方法来阻塞线程，直到条件对象发出唤醒信号或者超时之后，再进行之后的操作。
-         signal 和 broadcast 方法的区别在于，signal 只是一个信号量，只能唤醒一个等待的线程，想唤醒多个就得多次调用，而 broadcast 可以唤醒所有在等待的线程。
+         在加上锁之后，调用条件对象的 wait 或 waitUntilDate: 方法来阻塞线程，
+         直到条件对象发出唤醒信号或者超时之后，再进行之后的操作。
+         signal 和 broadcast 方法的区别在于，signal 只是一个信号量，只能唤醒一个等待的线程，
+         想唤醒多个就得多次调用，而 broadcast 可以唤醒所有在等待的线程。
          */
     });
 }
@@ -334,10 +360,16 @@
  dispatch_semaphore_wait(dispatch_semaphore_t _Nonnull dsema, dispatch_time_t timeout);
  dispatch_semaphore_signal(dispatch_semaphore_t _Nonnull dsema);
  */
+
+/**
+ 信号量实现锁
+ */
 -(void)dispatch_semophore
 {
     dispatch_semaphore_t semophore = dispatch_semaphore_create(1);
     dispatch_time_t overTime = dispatch_time(DISPATCH_TIME_NOW, 6*NSEC_PER_SEC);
+    //上述overTime 如果设置为3，那么overTime时限到了后，也会执行后续任务。
+    //异步函数 + 并发队列
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         dispatch_semaphore_wait(semophore, overTime);
         NSLog(@"线程1开始");
@@ -362,6 +394,7 @@
      */
 }
 
+
 //TODO:pthread_mutex 与 pthread_mutex(recursive) 互斥锁
 /*
  pthread 表示 POSIX thread，定义了一组跨平台的线程相关的 API，POSIX 互斥锁是一种超级易用的互斥锁。
@@ -382,6 +415,7 @@
 {
     __block pthread_mutex_t xzLock;
     pthread_mutex_init(&xzLock, NULL);
+    
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         pthread_mutex_lock(&xzLock);
         NSLog(@"线程1开始");
@@ -396,11 +430,13 @@
         pthread_mutex_unlock(&xzLock);
     });
     /*
-     它的用法和 NSLock 的 lock unlock 用法一致，而它也有一个 pthread_mutex_trylock 方法，pthread_mutex_trylock 和 tryLock 的区别在于，tryLock 返回的是 YES 和 NO，pthread_mutex_trylock 加锁成功返回的是 0，失败返回的是错误提示码。
+     它的用法和 NSLock 的 lock unlock 用法一致，而它也有一个 pthread_mutex_trylock 方法，
+     pthread_mutex_trylock 和 tryLock 的区别在于，tryLock 返回的是 YES 和 NO，
+     pthread_mutex_trylock 加锁成功返回的是 0，失败返回的是错误提示码。
      */
 }
 
-//递归锁
+//pthread_mutex(recursive)  互斥锁(递归形式)
 -(void)pthread_mutex_recursive
 {
     __block pthread_mutex_t xzLock;
@@ -425,10 +461,13 @@
         };
         RecursiveBlock(3);
         /*
-         pthread_mutex(recursive) 作用和 NSRecursiveLock 递归锁类似。如果使用 pthread_mutex_init(&theLock, NULL); 初始化锁的话，上面的代码的第二部分会出现死锁现象，使用递归锁就可以避免这种现象。
+         pthread_mutex(recursive) 作用和 NSRecursiveLock 递归锁类似。
+         如果使用 pthread_mutex_init(&theLock, NULL);
+         初始化锁的话，上面的代码的第二部分会出现死锁现象，使用递归锁就可以避免这种现象。
          */
     });
 }
+
 
 //TODO:OSSpinLock  自旋锁
 /*
@@ -472,9 +511,12 @@
         NSLog(@"线程2");
         OSSpinLockUnlock(&theLock);
     });
-    //自旋锁会存在优先级反转问题，不再安全
+    
     /*
-     如果一个低优先级的线程获得锁并访问共享资源，这时一个高优先级的线程也尝试获得这个锁，它会处于 spin lock 的忙等状态从而占用大量 CPU。此时低优先级线程无法与高优先级线程争夺 CPU 时间，从而导致任务迟迟完不成、无法释放 lock。
+     自旋锁会存在优先级反转问题，不再安全。
+     如果一个低优先级的线程获得锁并访问共享资源，
+     这时一个高优先级的线程也尝试获得这个锁，它会处于 spin lock 的忙等状态从而占用大量 CPU。
+     此时低优先级线程无法与高优先级线程争夺 CPU 时间，从而导致任务迟迟完不成、无法释放 lock。
      */
 }
 
@@ -492,8 +534,9 @@
  BOOL b = os_unfair_lock_trylock(unfairLock);
  // 解锁
  os_unfair_lock_unlock(unfairLock);
- os_unfair_lock 用法和 OSSpinLock 基本一直，就不一一列出了。
+ os_unfair_lock 用法和 OSSpinLock 基本一致，就不一一列出了。
  */
+
 
 //TODO：总结
 /*
